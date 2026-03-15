@@ -433,9 +433,15 @@ function calibColor(d) {
 }
 function nowTs() { return new Date().toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}); }
 function initials(n) { return n.split(" ").map(function(w){return w[0];}).join("").slice(0,2).toUpperCase(); }
+
+// ── FIX #1: doCSV — removed stray "; " suffix, added quote escaping ──
 function doCSV(data, fn) {
   var keys = Object.keys(data[0]);
-  var csv = [keys.join(",")].concat(data.map(function(r){ return keys.map(function(k){ return '"'+(r[k]!=null?r[k]:"")+'"; '; }).join(","); })).join("\n");
+  var csv = [keys.join(",")].concat(data.map(function(r){
+    return keys.map(function(k){
+      return '"' + String(r[k] != null ? r[k] : "").replace(/"/g, '""') + '"';
+    }).join(",");
+  })).join("\n");
   var a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
   a.download = fn; a.click();
@@ -446,18 +452,18 @@ function getAlertStatus(ticket, gauge) {
   if(!gauge || ticket.status === "returned") return {calib:"ok",ret:"ok",sev:"ok", isQtyLimit:false, isQtyWarning:false, remaining:0};
   var cd = daysUntil(gauge.nextCalibrationDate);
   var hd = daysHeld(ticket.issuedDate);
-  
+
   var max = parseInt(gauge.maxQtyLimit) || 1000;
   var used = parseInt(gauge.usedQty) || 0;
   var remaining = max - used;
 
   var isQtyLimit = remaining <= 0;
-  var isQtyWarning = remaining > 0 && remaining <= (max * 0.1); // 10% remaining warning
-  
+  var isQtyWarning = remaining > 0 && remaining <= (max * 0.1);
+
   var calib = (cd < 0 || isQtyLimit) ? "overdue" : ((cd <= 14 || isQtyWarning) ? "soon" : "ok");
   var ret = hd > 60 ? "critical" : (hd > 30 ? "warn" : "ok");
   var sev = (calib==="overdue"||ret==="critical") ? "danger" : ((calib==="soon"||ret==="warn") ? "warn" : "ok");
-  
+
   return {calib:calib, ret:ret, sev:sev, calibDays:cd, heldDays:hd, isQtyLimit:isQtyLimit, isQtyWarning:isQtyWarning, remaining:remaining};
 }
 
@@ -468,7 +474,7 @@ function buildEmail(gauge, ticket, type) {
   var pn = gauge.partNumber || "N/A";
   var sep = "----------------------------------------------";
   var header, action;
-  
+
   var max = parseInt(gauge.maxQtyLimit) || 1000;
   var used = parseInt(gauge.usedQty) || 0;
   var remaining = max - used;
@@ -479,7 +485,7 @@ function buildEmail(gauge, ticket, type) {
     action = "Please ensure " + ticket.entityName + " (" + ticket.employeeId + ")\nreturns this gauge to the Gauge Room immediately.\nDays held: " + hd;
   } else {
     header = (cd < 0 || isQtyLimit) ? "CALIBRATION OVERDUE — ACTION REQUIRED" : "CALIBRATION DUE SOON";
-    var s = isQtyLimit ? "QTY LIMIT REACHED ("+remaining+" remaining)" : 
+    var s = isQtyLimit ? "QTY LIMIT REACHED ("+remaining+" remaining)" :
             (cd < 0 ? "OVERDUE by " + Math.abs(cd) + " day(s)" : (cd === 0 ? "DUE TODAY" : "Due in " + cd + " day(s)"));
     action = "Schedule recalibration for Gauge " + gauge.gaugeNumber + " / Part " + pn + ".\nStatus: " + s;
   }
@@ -509,7 +515,7 @@ function DonutChart(props) {
   var segs = props.segments;
   var R=42, cx=52, cy=52, sw=12, circ=2*Math.PI*R;
   var realTotal = segs.reduce(function(s,x){return s+x.v;},0);
-  var calcTotal = realTotal || 1; 
+  var calcTotal = realTotal || 1;
   var cum = 0;
   return React.createElement("svg", {width:104,height:104,viewBox:"0 0 104 104"},
     React.createElement("circle",{cx:cx,cy:cy,r:R,fill:"none",stroke:"var(--border-light)",strokeWidth:sw}),
@@ -545,7 +551,7 @@ function AlertModal(props) {
   var g = props.gauge, t = props.ticket, at = props.atype;
   var hd = daysHeld(t.issuedDate);
   var targetEmail = t.email || props.settings.email;
-  
+
   var remaining = g ? (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0) : 0;
   var max = g ? (parseInt(g.maxQtyLimit)||1000) : 0;
 
@@ -586,8 +592,8 @@ function AlertModal(props) {
         <div className="mp-wrap">
           <div className="mp-to">
             <span className="mp-to-lbl">To:</span>
-            {targetEmail 
-              ? <span className="mp-to-val">{targetEmail}</span> 
+            {targetEmail
+              ? <span className="mp-to-val">{targetEmail}</span>
               : <span className="mp-to-err">No email configured for this ticket or in Settings</span>
             }
           </div>
@@ -624,7 +630,7 @@ function TicketRow(props) {
 
     if(cd !== null && cd < 0) tags.push({label:"Calib Overdue "+Math.abs(cd)+"d", cls:"at-r", ico:"🚨"});
     else if(cd !== null && cd <= 14) tags.push({label:"Calib Due "+cd+"d", cls:"at-y", ico:"⚠"});
-    
+
     if(!alert.isQtyLimit && !alert.isQtyWarning && cd > 14) tags.push({label:"Calib OK", cls:"at-g", ico:"✓"});
 
     if(alert.ret==="critical")    tags.push({label:"Return Critical "+hd+"d",         cls:"at-r", ico:"🔴"});
@@ -811,7 +817,7 @@ function App() {
   var settings=settS[0],setSettings=settS[1];
   var clkS=useState(function(){return new Date().toLocaleString("en-IN",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});});
   var clock=clkS[0],setClock=clkS[1];
-  var ifS=useState({gaugeId:"",entityName:"",employeeId:"",department:"",email:"",issuedDate:todayStr(),qtyInspected:""});
+  var ifS=useState({gaugeId:"",selectedPartNumber:"",entityName:"",employeeId:"",department:"",email:"",issuedDate:todayStr(),qtyInspected:""});
   var issueF=ifS[0],setIssueF=ifS[1];
   var cfS=useState({lastCalibrationDate:todayStr(),calibrationCycleDays:""});
   var calibF=cfS[0],setCalibF=cfS[1];
@@ -851,7 +857,7 @@ function App() {
   var myDept=user&&user.dept;
 
   var issuedG=gauges.filter(function(g){return g.status==="issued";});
-  
+
   var availG=gauges.filter(function(g){
     var rem = (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0);
     var isOverdue = daysUntil(g.nextCalibrationDate) < 0 || rem <= 0;
@@ -865,7 +871,7 @@ function App() {
   });
 
   var activeT=tickets.filter(function(t){return t.status==="active";});
-  var myTickets=tickets.filter(function(t){return t.dept===myDept;});
+  var myTickets=tickets.filter(function(t){return t.department===myDept;});
   var myActive=myTickets.filter(function(t){return t.status==="active";});
   var myGaugeIds={};
   myActive.forEach(function(t){myGaugeIds[t.gaugeId]=true;});
@@ -875,7 +881,7 @@ function App() {
     var rem = (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0);
     return g.status!=="issued" && (daysUntil(g.nextCalibrationDate)<0 || rem <= 0);
   });
-  
+
   var dueSoonG=gauges.filter(function(g){
     var d=daysUntil(g.nextCalibrationDate);
     var rem = (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0);
@@ -898,14 +904,17 @@ function App() {
     return gauges.slice().sort(function(a,b){return new Date(a.nextCalibrationDate)-new Date(b.nextCalibrationDate);}).slice(0,6);
   },[gauges]);
 
+  // ── FIX Minor A: Cleaner fStatus filter logic ──
   var filteredG=useMemo(function(){
     return gauges.filter(function(g){
       var s=search.toLowerCase();
       var ms=!search||g.gaugeNumber.toLowerCase().includes(s)||g.description.toLowerCase().includes(s)||(g.partNumber&&g.partNumber.toLowerCase().includes(s))||g.location.toLowerCase().includes(s);
-      var mf=fStatus==="all"||g.status===fStatus;
-      if(fStatus==="overdue") {
+      var mf;
+      if(fStatus === "overdue") {
         var rem = (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0);
         mf = (daysUntil(g.nextCalibrationDate)<0 || rem <= 0) && g.status!=="issued";
+      } else {
+        mf = fStatus==="all" || g.status===fStatus;
       }
       return ms&&mf;
     });
@@ -928,39 +937,52 @@ function App() {
   },[calibF]);
 
   // Dashboard Variables
-  var calibOkG = gauges.filter(function(g){ 
+  var calibOkG = gauges.filter(function(g){
     var rem = (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0);
-    return daysUntil(g.nextCalibrationDate) > 14 && rem > ((parseInt(g.maxQtyLimit)||1000)*0.1); 
+    return daysUntil(g.nextCalibrationDate) > 14 && rem > ((parseInt(g.maxQtyLimit)||1000)*0.1);
   }).length;
-  
-  var dueSoonAllG = gauges.filter(function(g){ 
-    var d = daysUntil(g.nextCalibrationDate); 
+
+  var dueSoonAllG = gauges.filter(function(g){
+    var d = daysUntil(g.nextCalibrationDate);
     var rem = (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0);
-    return rem > 0 && ((d >= 0 && d <= 14) || rem <= ((parseInt(g.maxQtyLimit)||1000)*0.1)); 
+    return rem > 0 && ((d >= 0 && d <= 14) || rem <= ((parseInt(g.maxQtyLimit)||1000)*0.1));
   }).length;
-  
-  var overdueAllG = gauges.filter(function(g){ 
+
+  var overdueAllG = gauges.filter(function(g){
     var rem = (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0);
-    return daysUntil(g.nextCalibrationDate) < 0 || rem <= 0; 
+    return daysUntil(g.nextCalibrationDate) < 0 || rem <= 0;
   }).length;
 
   function log(action,details){setAudit(function(p){return [{id:p.length+1,timestamp:nowTs(),action:action,details:details}].concat(p);});}
 
+  // ── FIX #2: handleIssue — qty overflow & zero validation ──
   function handleIssue() {
     var gaugeId=issueF.gaugeId,en=issueF.entityName,eid=issueF.employeeId,dept=issueF.department,email=issueF.email,idate=issueF.issuedDate,qtyInsp=issueF.qtyInspected;
     if(!gaugeId||!en||!eid||!dept||!email||!idate||!qtyInsp){addToast("Fill all required fields.","err","!");return;}
-    
+
     var g=gauges.filter(function(x){return x.id===gaugeId;})[0];
-    var tid="TKT-"+("000"+(tickets.length+1)).slice(-4);
     var qtyToInspect = parseInt(qtyInsp) || 0;
 
-    setTickets(function(p){return p.concat([{id:tid,gaugeId:gaugeId,gaugeNumber:g.gaugeNumber,partNumber:g.partNumber||"",gaugeDesc:g.description,entityName:en,employeeId:eid,department:dept,dept:dept,email:email,issuedDate:idate,qtyInspected:qtyInsp,returnedDate:null,status:"active"}]);});
-    setGauges(function(p){return p.map(function(x){return x.id===gaugeId?Object.assign({},x,{status:"issued", usedQty: (x.usedQty||0) + qtyToInspect}):x;});});
-    
+    if(qtyToInspect <= 0){
+      addToast("Quantity must be greater than 0.","err","!");
+      return;
+    }
+
+    var remaining = (parseInt(g.maxQtyLimit)||1000) - (parseInt(g.usedQty)||0);
+    if(qtyToInspect > remaining){
+      addToast("Qty ("+qtyToInspect+") exceeds remaining capacity ("+remaining+").","err","!");
+      return;
+    }
+
+    var tid="TKT-"+("000"+(tickets.length+1)).slice(-4);
+
+    setTickets(function(p){return p.concat([{id:tid,gaugeId:gaugeId,gaugeNumber:g.gaugeNumber,partNumber:g.partNumber||"",gaugeDesc:g.description,entityName:en,employeeId:eid,department:dept,email:email,issuedDate:idate,qtyInspected:qtyInsp,returnedDate:null,status:"active"}]);});
+    setGauges(function(p){return p.map(function(x){return x.id===gaugeId?Object.assign({},x,{status:"issued", usedQty: (parseInt(x.usedQty)||0) + qtyToInspect}):x;});});
+
     log("ISSUED",g.gaugeNumber+(g.partNumber?" [Part:"+g.partNumber+"]":"")+" → "+en+" ("+eid+") | "+dept+" | "+tid);
     addToast(tid+" raised for "+g.gaugeNumber,"ok","📋");
     setModal(null);
-    setIssueF({gaugeId:"",entityName:"",employeeId:"",department:isAdmin?"":myDept,email:"",issuedDate:todayStr(),qtyInspected:""});
+    setIssueF({gaugeId:"",selectedPartNumber:"",entityName:"",employeeId:"",department:isAdmin?"":myDept,email:"",issuedDate:todayStr(),qtyInspected:""});
   }
 
   function handleReturn(ticket) {
@@ -972,21 +994,28 @@ function App() {
 
   function handleCalib() {
     if(!calibF.lastCalibrationDate||!calibF.calibrationCycleDays){addToast("Fill all fields.","err","!");return;}
+    var cycleDays = parseInt(calibF.calibrationCycleDays);
+    if(!cycleDays || cycleDays < 1){addToast("Enter a valid calibration cycle (days ≥ 1).","err","!");return;}
     var next=new Date(calibF.lastCalibrationDate);
-    next.setDate(next.getDate()+parseInt(calibF.calibrationCycleDays));
+    next.setDate(next.getDate()+cycleDays);
     var ns=next.toISOString().split("T")[0];
-    setGauges(function(p){return p.map(function(g){return g.id===selGauge.id?Object.assign({},g,{lastCalibrationDate:calibF.lastCalibrationDate,calibrationCycleDays:parseInt(calibF.calibrationCycleDays),nextCalibrationDate:ns, usedQty:0}):g;});});
+    setGauges(function(p){return p.map(function(g){return g.id===selGauge.id?Object.assign({},g,{lastCalibrationDate:calibF.lastCalibrationDate,calibrationCycleDays:cycleDays,nextCalibrationDate:ns, usedQty:0}):g;});});
     log("CALIBRATED",selGauge.gaugeNumber+(selGauge.partNumber?" [Part:"+selGauge.partNumber+"]":"")+" recalibrated | Next: "+fmtDate(ns));
     addToast("Calibration updated & limit reset","warn","⚙");
     setModal(null);
   }
 
+  // ── FIX #3: handleAddGauge — cycle days & date validation ──
   function handleAddGauge() {
     if(!addF.gaugeNumber||!addF.description){addToast("Gauge number and description required.","err","!");return;}
+    var cycleDays = parseInt(addF.calibrationCycleDays);
+    if(!cycleDays || cycleDays < 1){addToast("Enter a valid calibration cycle (days ≥ 1).","err","!");return;}
+    if(!addF.lastCalibrationDate){addToast("Last calibration date is required.","err","!");return;}
     var next=new Date(addF.lastCalibrationDate);
-    next.setDate(next.getDate()+parseInt(addF.calibrationCycleDays));
+    next.setDate(next.getDate()+cycleDays);
+    if(isNaN(next.getTime())){addToast("Invalid calibration date.","err","!");return;}
     var newId="G"+("00"+(gauges.length+1)).slice(-3);
-    setGauges(function(p){return p.concat([{id:newId,gaugeNumber:addF.gaugeNumber,partNumber:addF.partNumber||"",description:addF.description,calibrationCycleDays:parseInt(addF.calibrationCycleDays),lastCalibrationDate:addF.lastCalibrationDate,nextCalibrationDate:next.toISOString().split("T")[0],status:"available",location:addF.location||"",maxQtyLimit:parseInt(addF.maxQtyLimit)||1000, usedQty:0}]);});
+    setGauges(function(p){return p.concat([{id:newId,gaugeNumber:addF.gaugeNumber,partNumber:addF.partNumber||"",description:addF.description,calibrationCycleDays:cycleDays,lastCalibrationDate:addF.lastCalibrationDate,nextCalibrationDate:next.toISOString().split("T")[0],status:"available",location:addF.location||"",maxQtyLimit:parseInt(addF.maxQtyLimit)||1000, usedQty:0}]);});
     log("ADDED",addF.gaugeNumber+(addF.partNumber?" [Part:"+addF.partNumber+"]":"")+" — "+addF.description+" added");
     addToast(addF.gaugeNumber+(addF.partNumber?" / "+addF.partNumber:"")+" added","ok","➕");
     setModal(null);
@@ -996,9 +1025,11 @@ function App() {
   function startEdit(g){setEditId(g.id);setEditRow({gaugeNumber:g.gaugeNumber,partNumber:g.partNumber||"",description:g.description,location:g.location||"",maxQtyLimit:String(g.maxQtyLimit||1000),calibrationCycleDays:String(g.calibrationCycleDays)});}
   function saveEdit(g) {
     if(!editRow.gaugeNumber||!editRow.description){addToast("Required fields missing.","err","!");return;}
+    var cycleDays = parseInt(editRow.calibrationCycleDays || g.calibrationCycleDays);
+    if(!cycleDays || cycleDays < 1){addToast("Enter a valid calibration cycle (days ≥ 1).","err","!");return;}
     var next=new Date(g.lastCalibrationDate);
-    next.setDate(next.getDate()+parseInt(editRow.calibrationCycleDays||g.calibrationCycleDays));
-    setGauges(function(p){return p.map(function(x){return x.id===g.id?Object.assign({},x,{gaugeNumber:editRow.gaugeNumber,partNumber:editRow.partNumber,description:editRow.description,location:editRow.location,maxQtyLimit:parseInt(editRow.maxQtyLimit)||1000,calibrationCycleDays:parseInt(editRow.calibrationCycleDays),nextCalibrationDate:next.toISOString().split("T")[0]}):x;});});
+    next.setDate(next.getDate()+cycleDays);
+    setGauges(function(p){return p.map(function(x){return x.id===g.id?Object.assign({},x,{gaugeNumber:editRow.gaugeNumber,partNumber:editRow.partNumber,description:editRow.description,location:editRow.location,maxQtyLimit:parseInt(editRow.maxQtyLimit)||1000,calibrationCycleDays:cycleDays,nextCalibrationDate:next.toISOString().split("T")[0]}):x;});});
     log("EDITED",g.gaugeNumber+" → "+editRow.gaugeNumber+(editRow.partNumber?" [Part:"+editRow.partNumber+"]":""));
     addToast(editRow.gaugeNumber+" updated","ok","✓");
     setEditId(null);
@@ -1015,7 +1046,7 @@ function App() {
 
   function openAlertModal(gauge,ticket,atype){setAlertModal({gauge:gauge,ticket:ticket,atype:atype});}
   function switchTab(t){setTab(t);setSearch("");setFStatus("all");setFDept("all");}
-  function openIssue(){setIssueF({gaugeId:"",entityName:"",employeeId:"",department:isAdmin?"":myDept,email:"",issuedDate:todayStr(),qtyInspected:""});setModal("issue");}
+  function openIssue(){setIssueF({gaugeId:"",selectedPartNumber:"",entityName:"",employeeId:"",department:isAdmin?"":myDept,email:"",issuedDate:todayStr(),qtyInspected:""});setModal("issue");}
 
   if(!user) return <LoginPage onLogin={function(u){setUser(u);setTab("dashboard");}} isDark={isDark} toggleTheme={toggleTheme}/>;
 
@@ -1026,7 +1057,7 @@ function App() {
         <div className="logo">⊙</div>
         <div><div className="app-name">Gauge Room IMS</div></div>
         <div className="hspace"/>
-        
+
         <button className="bell-btn" onClick={toggleTheme} title="Toggle Theme" style={{marginRight: 4}}>
           {isDark ? "☀️" : "🌙"}
         </button>
@@ -1097,10 +1128,24 @@ function App() {
           <div className="md" onClick={function(e){e.stopPropagation();}}>
             <div className="md-title">Raise Gauge Request <button className="md-close" onClick={function(){setModal(null);}}>✕</button></div>
             <div className="fg">
-              <div className="fl fgf"><label>Select Ready Gauge *</label>
-                <select value={issueF.gaugeId} onChange={function(e){setIssueF(Object.assign({},issueF,{gaugeId:e.target.value}));}}>
-                  <option value="">— Choose a gauge from inventory —</option>
-                  {availG.map(function(g){return <option key={g.id} value={g.id}>{g.gaugeNumber} — {g.description}</option>;})}
+              <div className="fl fgf">
+                <label>① Part Number *</label>
+                <select value={issueF.selectedPartNumber} onChange={function(e){setIssueF(Object.assign({},issueF,{selectedPartNumber:e.target.value,gaugeId:""}));}}>
+                  <option value="">— Select a part number —</option>
+                  {(function(){
+                    var parts=[]; var seen={};
+                    availG.forEach(function(g){ var pn=g.partNumber||"__NOPART__"; if(!seen[pn]){seen[pn]=true;parts.push(pn);} });
+                    return parts.map(function(pn){ return <option key={pn} value={pn}>{pn==="__NOPART__"?"(No Part Number)":pn}</option>; });
+                  })()}
+                </select>
+              </div>
+              <div className="fl fgf">
+                <label style={{color:issueF.selectedPartNumber?"var(--text-dark)":"var(--text-light)"}}>② Gauge Number *</label>
+                <select value={issueF.gaugeId} onChange={function(e){setIssueF(Object.assign({},issueF,{gaugeId:e.target.value}));}} disabled={!issueF.selectedPartNumber} style={{opacity:issueF.selectedPartNumber?1:0.5,cursor:issueF.selectedPartNumber?"pointer":"not-allowed"}}>
+                  <option value="">{issueF.selectedPartNumber?"— Select a gauge number —":"— Select part number first —"}</option>
+                  {availG.filter(function(g){return (g.partNumber||"__NOPART__")===issueF.selectedPartNumber;}).map(function(g){
+                    return <option key={g.id} value={g.id}>{g.gaugeNumber} — {g.description}</option>;
+                  })}
                 </select>
               </div>
               {issueF.gaugeId&&(function(){
@@ -1261,7 +1306,7 @@ function App() {
                 <thead><tr><th>Gauge No.</th><th>Part No.</th><th>Description</th><th>Location</th><th>Remaining Qty</th><th>Status</th><th>Last Calib.</th><th>Next Calib.</th><th>Cycle</th><th>Actions</th></tr></thead>
                 <tbody>{filteredG.map(function(g){
                   var d=daysUntil(g.nextCalibrationDate),col=calibColor(g.nextCalibrationDate),ed=editId===g.id;
-                  
+
                   var max = parseInt(g.maxQtyLimit)||1000;
                   var used = parseInt(g.usedQty)||0;
                   var rem = max - used;
@@ -1417,10 +1462,24 @@ function App() {
             <div className="md-title">Raise Issue Ticket <button className="md-close" onClick={function(){setModal(null);}}>✕</button></div>
             {availG.length===0&&<div className="bnr bnr-y" style={{marginBottom:12}}><span>⚠</span><div className="bnr-body"><div className="bnr-text bt-txt-y">No ready gauges. All available gauges may require calibration.</div></div></div>}
             <div className="fg">
-              <div className="fl fgf"><label>Select Ready Gauge *</label>
-                <select value={issueF.gaugeId} onChange={function(e){setIssueF(Object.assign({},issueF,{gaugeId:e.target.value}));}}>
-                  <option value="">— Choose a gauge from inventory —</option>
-                  {availG.map(function(g){return <option key={g.id} value={g.id}>{g.gaugeNumber} — {g.description}</option>;})}
+              <div className="fl fgf">
+                <label>① Part Number *</label>
+                <select value={issueF.selectedPartNumber} onChange={function(e){setIssueF(Object.assign({},issueF,{selectedPartNumber:e.target.value,gaugeId:""}));}}>
+                  <option value="">— Select a part number —</option>
+                  {(function(){
+                    var parts=[]; var seen={};
+                    availG.forEach(function(g){ var pn=g.partNumber||"__NOPART__"; if(!seen[pn]){seen[pn]=true;parts.push(pn);} });
+                    return parts.map(function(pn){ return <option key={pn} value={pn}>{pn==="__NOPART__"?"(No Part Number)":pn}</option>; });
+                  })()}
+                </select>
+              </div>
+              <div className="fl fgf">
+                <label style={{color:issueF.selectedPartNumber?"var(--text-dark)":"var(--text-light)"}}>② Gauge Number *</label>
+                <select value={issueF.gaugeId} onChange={function(e){setIssueF(Object.assign({},issueF,{gaugeId:e.target.value}));}} disabled={!issueF.selectedPartNumber} style={{opacity:issueF.selectedPartNumber?1:0.5,cursor:issueF.selectedPartNumber?"pointer":"not-allowed"}}>
+                  <option value="">{issueF.selectedPartNumber?"— Select a gauge number —":"— Select part number first —"}</option>
+                  {availG.filter(function(g){return (g.partNumber||"__NOPART__")===issueF.selectedPartNumber;}).map(function(g){
+                    return <option key={g.id} value={g.id}>{g.gaugeNumber} — {g.description}</option>;
+                  })}
                 </select>
               </div>
               {issueF.gaugeId&&(function(){
@@ -1491,8 +1550,8 @@ function App() {
               <div className="fl fgf"><label>Description *</label><input value={addF.description} onChange={function(e){setAddF(Object.assign({},addF,{description:e.target.value}));}} placeholder="e.g. Vernier Caliper 0-150mm"/></div>
               <div className="fl"><label>Location</label><input value={addF.location} onChange={function(e){setAddF(Object.assign({},addF,{location:e.target.value}));}} placeholder="Shelf A1"/></div>
               <div className="fl"><label>Max Inspection Qty (Limit)</label><input type="number" value={addF.maxQtyLimit} onChange={function(e){setAddF(Object.assign({},addF,{maxQtyLimit:e.target.value}));}} min="1"/></div>
-              <div className="fl"><label>Last Calibration Date</label><input type="date" value={addF.lastCalibrationDate} onChange={function(e){setAddF(Object.assign({},addF,{lastCalibrationDate:e.target.value}));}}/></div>
-              <div className="fl"><label>Cycle Duration (days)</label><input type="number" value={addF.calibrationCycleDays} onChange={function(e){setAddF(Object.assign({},addF,{calibrationCycleDays:e.target.value}));}} min={1}/></div>
+              <div className="fl"><label>Last Calibration Date *</label><input type="date" value={addF.lastCalibrationDate} onChange={function(e){setAddF(Object.assign({},addF,{lastCalibrationDate:e.target.value}));}}/></div>
+              <div className="fl"><label>Cycle Duration (days) *</label><input type="number" value={addF.calibrationCycleDays} onChange={function(e){setAddF(Object.assign({},addF,{calibrationCycleDays:e.target.value}));}} min={1}/></div>
             </div>
             <div className="md-actions"><button className="btn btn-ghost" onClick={function(){setModal(null);}}>Cancel</button><button className="btn btn-blue" onClick={handleAddGauge}>Add to Inventory</button></div>
           </div>
